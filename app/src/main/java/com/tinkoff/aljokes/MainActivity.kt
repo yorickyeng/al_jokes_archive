@@ -1,10 +1,16 @@
 package com.tinkoff.aljokes
 
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,13 +37,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.tinkoff.aljokes.data.Joke
 import com.tinkoff.aljokes.data.RetrofitInstance
+import com.tinkoff.aljokes.ui.theme.AlJokesTheme
 import kotlinx.coroutines.launch
 
 
@@ -45,7 +49,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            Kitten()
+            enableEdgeToEdge()
+            AlJokesTheme(darkTheme = isSystemInDarkTheme()) {
+                Kitten()
+            }
         }
     }
 }
@@ -53,13 +60,16 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun Kitten() {
     val list = remember { mutableStateListOf<Joke>() }
+    var dark by remember { mutableStateOf(false) }
+    dark = isSystemInDarkTheme()
 
     LaunchedEffect(Unit) {
-        loadJokes(list, 10)
+        loadJokes(list, 10, dark)
     }
 
     Column(
         modifier = Modifier
+            .background(MaterialTheme.colorScheme.background)
             .padding(all = 10.dp),
     ) {
         LazyColumn {
@@ -67,25 +77,56 @@ fun Kitten() {
                 Image(
                     painter = painterResource(R.drawable.kitten),
                     contentDescription = "Kitten",
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 16.dp)
+                        .padding(bottom = 16.dp),
                     alignment = Alignment.Center,
                 )
             }
-            items(jokeRepository) { joke -> JokeBlock(joke, Color.Magenta) }
-            items(list) { joke -> JokeBlock(joke, Color.Red) }
-            item { LoadMoreButton(list) }
+            items(jokeRepository) { joke -> JokeBlock(joke, MaterialTheme.colorScheme.primary) }
+            items(list) { joke -> JokeBlock(joke, MaterialTheme.colorScheme.tertiary) }
+            item { LoadMoreButton(list, dark) }
         }
     }
 }
 
 @Composable
-@Preview(showSystemUi = true)
-fun KittenPreview() {
-    Kitten()
+fun JokeBlock(joke: Joke, color: Color) {
+    var isExpanded by remember { mutableStateOf(false) }
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        shadowElevation = 1.dp,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = 8.dp)
+            .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+            .clickable { isExpanded = !isExpanded }
+            .animateContentSize(),
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(10.dp)
+        ) {
+            Text(
+                text = joke.setup,
+                color = color,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            if (isExpanded) {
+                Text(
+                    text = joke.delivery,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+
 }
 
 @Composable
-fun LoadMoreButton(list: MutableList<Joke>) {
+fun LoadMoreButton(list: MutableList<Joke>, dark: Boolean) {
     val coroutineScope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(false) }
 
@@ -93,7 +134,7 @@ fun LoadMoreButton(list: MutableList<Joke>) {
         onClick = {
             loading = true
             coroutineScope.launch {
-                loadJokes(list, 10)
+                loadJokes(list, 10, dark)
                 loading = false
             }
         },
@@ -107,7 +148,7 @@ fun LoadMoreButton(list: MutableList<Joke>) {
                 modifier = Modifier
                     .width(24.dp)
                     .height(24.dp),
-                color = MaterialTheme.colorScheme.onPrimary, // Индикатор контрастного цвета
+                color = MaterialTheme.colorScheme.onPrimary,
                 strokeWidth = 2.dp
             )
         } else {
@@ -115,45 +156,6 @@ fun LoadMoreButton(list: MutableList<Joke>) {
         }
     }
 }
-
-@Composable
-fun JokeBlock(joke: Joke, color: Color) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        shadowElevation = 1.dp,
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(bottom = 8.dp)
-            .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(10.dp)
-        ) {
-            Text(
-                text = joke.setup,
-                style = TextStyle(
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = color,
-                ),
-            )
-            Text(
-                text = joke.delivery,
-                style = TextStyle(
-                    fontSize = 16.sp,
-                )
-            )
-        }
-    }
-
-}
-
-//@Composable
-//@Preview(showSystemUi = true)
-//fun JokeBlockPreview() {
-//    JokeBlock(jokeRepository[0], Color.Red)
-//}
 
 val jokeRepository = listOf(
     Joke(
@@ -177,11 +179,34 @@ val jokeRepository = listOf(
     Joke("What do you call cheese that isn’t yours?", "Nacho cheese."),
 )
 
-private suspend fun loadJokes(list: MutableList<Joke>, count: Int) {
+private suspend fun loadJokes(list: MutableList<Joke>, count: Int, dark: Boolean) {
     try {
-        val response = RetrofitInstance.api.getJoke(count)
-        list.addAll(response.jokes)
+        if (dark) {
+            val response = RetrofitInstance.api.getDarkJoke(count)
+            list.addAll(response.jokes)
+        } else {
+            val response = RetrofitInstance.api.getAnyJoke(count)
+            list.addAll(response.jokes)
+        }
     } catch (e: Exception) {
         println("Error: ${e.message}")
     }
+}
+
+@Composable
+@Preview(
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    showBackground = true,
+    name = "Dark Mode"
+)
+fun KittenPreview() {
+    AlJokesTheme(darkTheme = true) {
+        Kitten()
+    }
+}
+
+@Composable
+@Preview(showBackground = true)
+fun JokeBlockPreview() {
+    JokeBlock(jokeRepository[0], MaterialTheme.colorScheme.primary)
 }

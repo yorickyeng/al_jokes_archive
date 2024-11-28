@@ -4,9 +4,14 @@ import retrofit2.http.GET
 import retrofit2.http.Query
 
 interface ApiService {
-//    https://v2.jokeapi.dev/joke/Dark?amount=10&type=twopart
+    @GET("/joke/Dark")
+    suspend fun getDarkJoke(
+        @Query("amount") amount: Int = 10,
+        @Query("type") type: String = "twopart"
+    ): JokeResponse
+
     @GET("/joke/Any?blacklistFlags=nsfw,religious,political,racist,sexist,explicit")
-    suspend fun getJoke(
+    suspend fun getAnyJoke(
         @Query("amount") amount: Int = 10,
         @Query("type") type: String = "twopart"
     ): JokeResponse
