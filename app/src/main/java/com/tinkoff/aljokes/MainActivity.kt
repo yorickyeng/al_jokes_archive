@@ -110,7 +110,8 @@ fun Kitten() {
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(top = 16.dp)
-                        .padding(bottom = 16.dp),
+                        .padding(bottom = 16.dp)
+                        .clickable(onClick = { reloadCat = !reloadCat }),
                     loading = {
                         Box(
                             modifier = Modifier
