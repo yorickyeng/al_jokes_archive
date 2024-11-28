@@ -14,14 +14,11 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -63,22 +61,38 @@ fun Kitten() {
     var dark by remember { mutableStateOf(false) }
     dark = isSystemInDarkTheme()
 
-    LaunchedEffect(Unit) {
-        loadJokes(list, 10, dark)
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo }
+            .collect { visibleItems ->
+                val totalItems = listState.layoutInfo.totalItemsCount
+                val lastVisibleItemIndex = visibleItems.lastOrNull()?.index ?: 0
+
+                if (totalItems > 0 && lastVisibleItemIndex >= totalItems - 1) {
+                    coroutineScope.launch {
+                        loadJokes(list, 10, dark)
+                    }
+                }
+            }
     }
 
     Column(
         modifier = Modifier
+            .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .padding(all = 10.dp),
     ) {
-        LazyColumn {
+        LazyColumn(
+            state = listState
+        ) {
             item {
                 Image(
                     painter = painterResource(R.drawable.kitten),
                     contentDescription = "Kitten",
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
                         .padding(top = 16.dp)
                         .padding(bottom = 16.dp),
                     alignment = Alignment.Center,
@@ -86,7 +100,6 @@ fun Kitten() {
             }
             items(jokeRepository) { joke -> JokeBlock(joke, MaterialTheme.colorScheme.primary) }
             items(list) { joke -> JokeBlock(joke, MaterialTheme.colorScheme.tertiary) }
-            item { LoadMoreButton(list, dark) }
         }
     }
 }
@@ -123,38 +136,6 @@ fun JokeBlock(joke: Joke, color: Color) {
         }
     }
 
-}
-
-@Composable
-fun LoadMoreButton(list: MutableList<Joke>, dark: Boolean) {
-    val coroutineScope = rememberCoroutineScope()
-    var loading by remember { mutableStateOf(false) }
-
-    Button(
-        onClick = {
-            loading = true
-            coroutineScope.launch {
-                loadJokes(list, 10, dark)
-                loading = false
-            }
-        },
-        enabled = !loading,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        if (loading) {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .width(24.dp)
-                    .height(24.dp),
-                color = MaterialTheme.colorScheme.onPrimary,
-                strokeWidth = 2.dp
-            )
-        } else {
-            Text("Load More")
-        }
-    }
 }
 
 val jokeRepository = listOf(
